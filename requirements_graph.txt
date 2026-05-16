@@ -1,0 +1,3 @@
+# Graph and Network Analysis Dependencies
+networkx>=3.2.0
+scipy>=1.11.0
