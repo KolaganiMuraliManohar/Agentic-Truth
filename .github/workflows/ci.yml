@@ -30,11 +30,10 @@ jobs:
       env:
         GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       run: |
-        # Use pytest for all tests under the /tests or /scripts directory
+        # Use pytest for all tests under the /tests directory
         pip install pytest pytest-asyncio
-        # Note: in a real pipeline we would run pytest tests/
         echo "Running tests..."
-        python test_imports.py
+        pytest tests/
 
   build-frontend:
     runs-on: ubuntu-latest
