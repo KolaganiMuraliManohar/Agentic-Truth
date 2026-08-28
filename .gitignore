@@ -20,8 +20,8 @@ mlruns/
 wandb/
 data/raw/
 data/processed/
-data/chroma_db/
-models/
+/models/
+!src/models/
 
 # Jupyter
 .ipynb_checkpoints/

@@ -1,248 +1,374 @@
- import React, { useState, useRef } from 'react';
-import { Search, CheckCircle, XCircle, AlertTriangle, ImageIcon, ChevronRight, HardDrive } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import {
+  Upload,
+  Image as ImageIcon,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  FileVideo,
+  Camera,
+  Cpu,
+  Search,
+  Sparkles,
+  HardDrive
+} from 'lucide-react';
+import { DetectionResult, AgentNodeState, AgentThought } from '../types/agent';
+import { agentGraphService } from '../services/agentGraph';
+import { AgentGraphVisualizer } from '../components/AgentGraphVisualizer';
+import { AgentThoughtStream } from '../components/AgentThoughtStream';
 
-interface Evidence {
-    type: string;
-    description: string;
-    confidence: number;
-    severity: string;
-    source_url?: string;
-    proof_quote?: string;
-}
-
-interface AnalysisResult {
-    verdict: string;
-    confidence: number;
-    evidence: Evidence[];
-    recommendation: string;
-}
+const PRESET_MEDIA = [
+  {
+    name: 'Synthetic Midjourney Portrait (AI)',
+    type: 'image/jpeg',
+    isAi: true,
+    desc: 'Deepfake diffusion image with stripped EXIF and unnatural skin smoothing',
+  },
+  {
+    name: 'DSLR Camera Photo (Authentic)',
+    type: 'image/jpeg',
+    isAi: false,
+    desc: 'Sony ILCE-7M4 authentic optical sensor raw Bayer output with valid lens profile',
+  },
+];
 
 const ImageScanner: React.FC = () => {
-    const [file, setFile] = useState<File | null>(null);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [isScanning, setIsScanning] = useState(false);
-    const [result, setResult] = useState<AnalysisResult | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressMsg, setProgressMsg] = useState('');
+  const [nodes, setNodes] = useState<AgentNodeState[]>([]);
+  const [thoughts, setThoughts] = useState<AgentThought[]>([]);
+  const [result, setResult] = useState<DetectionResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const selectedFile = e.target.files[0];
-            setFile(selectedFile);
-            setPreviewUrl(URL.createObjectURL(selectedFile));
-            setResult(null);
-            setError(null);
-        }
-    };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selected = e.target.files[0];
+      setFile(selected);
+      setPreviewUrl(URL.createObjectURL(selected));
+      setResult(null);
+      setError(null);
+    }
+  };
 
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            const selectedFile = e.dataTransfer.files[0];
-            if (selectedFile.type.startsWith('image/') || selectedFile.type.startsWith('video/')) {
-                setFile(selectedFile);
-                setPreviewUrl(URL.createObjectURL(selectedFile));
-                setResult(null);
-                setError(null);
-            }
-        }
-    };
-
-    const clearSelection = () => {
-        setFile(null);
-        setPreviewUrl(null);
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const selected = e.dataTransfer.files[0];
+      if (selected.type.startsWith('image/') || selected.type.startsWith('video/')) {
+        setFile(selected);
+        setPreviewUrl(URL.createObjectURL(selected));
         setResult(null);
         setError(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
+      }
+    }
+  };
 
-    const handleScan = async () => {
-        if (!file) return;
+  const selectPreset = (preset: typeof PRESET_MEDIA[0]) => {
+    // Generate a mock synthetic / camera file
+    const mockFile = new File(['mock data content'], preset.isAi ? 'synthetic_gen_portrait.jpg' : 'dsc_sony_photo.jpg', {
+      type: preset.type,
+    });
+    setFile(mockFile);
+    setPreviewUrl(null);
+    setResult(null);
+    setError(null);
+  };
 
-        setIsScanning(true);
-        setError(null);
-        setResult(null);
+  const clearSelection = () => {
+    setFile(null);
+    setPreviewUrl(null);
+    setResult(null);
+    setError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
-        const formData = new FormData();
-        formData.append('file', file);
+  const handleScan = async () => {
+    if (!file) return;
 
-        const endpoint = file.type.startsWith('video/') ? '/api/analyze/video' : '/api/analyze/image';
+    setIsScanning(true);
+    setError(null);
+    setResult(null);
+    setThoughts([]);
+    setProgress(0);
 
-        try {
-            const response = await fetch(`http://127.0.0.1:8000${endpoint}`, {
-                method: 'POST',
-                // Omit Content-Type to let browser set boundary for multipart/form-data
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error(`Error: ${response.statusText}`);
+    try {
+      const res = await agentGraphService.executeMediaGraph(file, {
+        onNodeStart: (node) => {
+          setNodes((prev) => {
+            const existing = prev.find((n) => n.id === node.id);
+            if (existing) {
+              return prev.map((n) => (n.id === node.id ? { ...node } : n));
             }
+            return [...prev, { ...node }];
+          });
+        },
+        onNodeComplete: (node) => {
+          setNodes((prev) => prev.map((n) => (n.id === node.id ? { ...node } : n)));
+        },
+        onThought: (thought) => {
+          setThoughts((prev) => [...prev, thought]);
+        },
+        onProgress: (pct, msg) => {
+          setProgress(pct);
+          setProgressMsg(msg);
+        },
+      });
 
-            const data = await response.json();
-            setResult(data);
-        } catch (err: any) {
-            setError(err.message || 'Failed to scan. Ensure API server is running on :8000');
-        } finally {
-            setIsScanning(false);
-        }
-    };
+      setResult(res);
+      if (res.execution_trace?.nodes) {
+        setNodes(res.execution_trace.nodes);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error executing media forensics.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
-    const renderVerdictBadge = (verdict: string) => {
-        switch (verdict.toUpperCase()) {
-            case 'LIKELY_FAKE':
-                return <span className="status-badge status-fake"><XCircle size={16} /> Manipulated</span>;
-            case 'LIKELY_REAL':
-                return <span className="status-badge status-real"><CheckCircle size={16} /> Authentic</span>;
-            default:
-                return <span className="status-badge status-uncertain"><AlertTriangle size={16} /> Uncertain</span>;
-        }
-    };
+  const renderVerdictBadge = (verdict: string) => {
+    switch (verdict.toUpperCase()) {
+      case 'LIKELY_FAKE':
+        return (
+          <span className="status-badge status-fake">
+            <XCircle size={16} /> Synthetic / Manipulated
+          </span>
+        );
+      case 'LIKELY_REAL':
+        return (
+          <span className="status-badge status-real">
+            <CheckCircle size={16} /> Authentic Media
+          </span>
+        );
+      default:
+        return (
+          <span className="status-badge status-uncertain">
+            <AlertTriangle size={16} /> Inconclusive / Stripped EXIF
+          </span>
+        );
+    }
+  };
 
-    return (
-        <div className="content-wrapper">
-            <div className="glass-panel" style={{ padding: '2rem' }}>
-                <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Media Analysis</h1>
-                <p style={{ marginBottom: '2rem' }}>
-                    Upload an image or video to run Deepfake ViT detection, OCR meme fact-checking, and CLIP reverse-image search.
-                </p>
-
-                {!file ? (
-                    <div
-                        className="card"
-                        style={{
-                            border: '2px dashed var(--border-color)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '4rem 2rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            marginBottom: '1.5rem'
-                        }}
-                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--accent-color)'; }}
-                        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            style={{ display: 'none' }}
-                            accept="image/*,video/mp4,video/quicktime"
-                            onChange={handleFileChange}
-                        />
-                        <HardDrive size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem' }} />
-                        <h3 style={{ marginBottom: '0.5rem' }}>Drag & drop media here</h3>
-                        <p style={{ textAlign: 'center', fontSize: '0.9rem' }}>Supports JPG, PNG, WEBP, MP4 (Max 20MB)</p>
-                        <p style={{ marginTop: '1rem', color: 'var(--accent-color)' }}>Or click to browse</p>
-                    </div>
-                ) : (
-                    <div className="card" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                        {file.type.startsWith('image/') ? (
-                            <img src={previewUrl!} alt="Preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />
-                        ) : (
-                            <div style={{ width: '120px', height: '120px', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px' }}>
-                                <ImageIcon size={32} color="var(--text-secondary)" />
-                            </div>
-                        )}
-
-                        <div style={{ flex: 1 }}>
-                            <h4 style={{ margin: 0, wordBreak: 'break-all' }}>{file.name}</h4>
-                            <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                            <button className="btn" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', marginTop: '0.75rem' }} onClick={clearSelection}>
-                                Remove
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                <button
-                    className="btn btn-primary"
-                    onClick={handleScan}
-                    disabled={isScanning || !file}
-                    style={{ width: '100%' }}
-                >
-                    {isScanning ? (
-                        <>
-                            <Search className="spinner" size={20} /> Running Vision Models...
-                        </>
-                    ) : (
-                        <>
-                            <Search size={20} /> Analyze Media
-                        </>
-                    )}
-                </button>
-
-                {error && (
-                    <div style={{ marginTop: '1.5rem', color: 'var(--danger)', background: 'rgba(248, 81, 73, 0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(248, 81, 73, 0.2)' }}>
-                        {error}
-                    </div>
-                )}
-            </div>
-
-            {result && (
-                <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.5rem' }}>
-                        <div>
-                            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Deepfake & Media Report</h2>
-                            <p>Confidence: {(result.confidence * 100).toFixed(1)}%</p>
-                        </div>
-                        <div>
-                            {renderVerdictBadge(result.verdict)}
-                        </div>
-                    </div>
-
-                    <div style={{ marginBottom: '2rem' }}>
-                        <h3 style={{ marginBottom: '1rem' }}>System Conclusion</h3>
-                        <div className="card" style={{ background: result.verdict === 'LIKELY_FAKE' ? 'rgba(248, 81, 73, 0.05)' : 'rgba(22, 27, 34, 0.4)' }}>
-                            <p style={{ color: result.verdict === 'LIKELY_FAKE' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{result.recommendation}</p>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <ChevronRight size={20} color="var(--accent-color)" /> Visual Anomalies Found
-                        </h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {result.evidence.map((ev, idx) => (
-                                <div key={idx} className="card" style={{ position: 'relative', overflow: 'hidden' }}>
-                                    <div style={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        width: '4px',
-                                        background: ev.severity === 'HIGH' ? 'var(--danger)' : ev.severity === 'MEDIUM' ? 'var(--warning)' : 'var(--success)'
-                                    }} />
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-                                            {ev.type.replace('_', ' ')}
-                                        </span>
-                                        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                            {(ev.confidence * 100).toFixed(0)}%
-                                        </span>
-                                    </div>
-                                    <p style={{ fontSize: '0.95rem', marginBottom: '0.5rem' }}>{ev.description}</p>
-
-                                    {ev.proof_quote && (
-                                        <div style={{ background: 'rgba(1, 4, 9, 0.5)', padding: '0.75rem', borderRadius: '4px', borderLeft: '2px solid var(--border-color)', fontSize: '0.9rem', fontStyle: 'italic', marginBottom: '0.5rem' }}>
-                                            "{ev.proof_quote}"
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                            {result.evidence.length === 0 && (
-                                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No anomalies detected in this media file.</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+  return (
+    <div className="content-wrapper">
+      <div className="glass-panel text-scanner-hero">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <Camera size={28} color="var(--accent-color)" />
+          <h1 style={{ fontSize: '1.85rem', margin: 0 }}>Multi-Modal Media Forensics</h1>
         </div>
-    );
+        <p style={{ maxWidth: '850px', marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
+          Detect deepfakes, AI diffusion signatures, face-swaps, and EXIF metadata stripping across images and video feeds using our multi-stage Vision Transformer & Provenance Graph pipeline.
+        </p>
+
+        {/* Presets */}
+        <div className="preset-bar">
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Sparkles size={14} color="var(--accent-color)" /> Test Presets:
+          </span>
+          {PRESET_MEDIA.map((p, idx) => (
+            <button key={idx} className="preset-pill" onClick={() => selectPreset(p)}>
+              {p.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Upload Dropzone */}
+        <div
+          className={`dropzone ${file ? 'has-file' : ''}`}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          onClick={() => !file && fileInputRef.current?.click()}
+          style={{ marginTop: '1.25rem' }}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*,video/*"
+            style={{ display: 'none' }}
+          />
+
+          {file ? (
+            <div className="file-preview-container">
+              {previewUrl && file.type.startsWith('image/') ? (
+                <img src={previewUrl} alt="Preview" className="media-preview-img" />
+              ) : (
+                <div className="file-icon-box">
+                  {file.type.startsWith('video/') ? <FileVideo size={48} color="#58a6ff" /> : <ImageIcon size={48} color="#58a6ff" />}
+                </div>
+              )}
+              <div className="file-details">
+                <strong>{file.name}</strong>
+                <span>{(file.size / 1024).toFixed(1)} KB • {file.type || 'Media File'}</span>
+                <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); clearSelection(); }}>
+                  Change File
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="dropzone-empty">
+              <Upload size={40} color="var(--accent-color)" />
+              <h4 style={{ marginTop: '0.75rem', marginBottom: '0.25rem' }}>Drop image or video here, or browse</h4>
+              <p style={{ fontSize: '0.85rem' }}>Supports JPG, PNG, WEBP, MP4, MOV up to 100MB</p>
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-primary"
+            onClick={handleScan}
+            disabled={isScanning || !file}
+            style={{ minWidth: '200px' }}
+          >
+            {isScanning ? (
+              <>
+                <Search className="spinner" size={18} /> Analyzing Forensics...
+              </>
+            ) : (
+              <>
+                <Cpu size={18} /> Execute Forensic Graph
+              </>
+            )}
+          </button>
+        </div>
+
+        {error && (
+          <div className="error-box" style={{ marginTop: '1rem' }}>
+            <AlertTriangle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
+
+      {/* LangGraph Visualizer */}
+      {(isScanning || nodes.length > 0) && (
+        <div className="glass-panel" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
+          <AgentGraphVisualizer
+            nodes={nodes}
+            isExecuting={isScanning}
+            currentProgress={progress}
+            progressMessage={progressMsg}
+          />
+        </div>
+      )}
+
+      {/* Thought Stream */}
+      {(isScanning || thoughts.length > 0) && (
+        <div style={{ marginTop: '1.5rem' }}>
+          <AgentThoughtStream thoughts={thoughts} trace={result?.execution_trace} />
+        </div>
+      )}
+
+      {/* Forensic Results */}
+      {result && (
+        <div className="glass-panel animate-fade-in" style={{ marginTop: '1.5rem', padding: '2rem' }}>
+          <div className="results-header">
+            <div>
+              <h2 style={{ fontSize: '1.6rem', marginBottom: '0.4rem' }}>Media Forensic Verdict</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '0.5rem' }}>
+                <span className="metric-pill">
+                  Confidence: <strong>{(result.confidence * 100).toFixed(1)}%</strong>
+                </span>
+                {result.execution_trace?.totalDurationMs && (
+                  <span className="metric-pill">
+                    Latency: <strong>{result.execution_trace.totalDurationMs}ms</strong>
+                  </span>
+                )}
+              </div>
+            </div>
+            <div>{renderVerdictBadge(result.verdict)}</div>
+          </div>
+
+          <div style={{ margin: '1.75rem 0' }}>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Recommendation</h3>
+            <div className={`recommendation-card ${result.verdict.toLowerCase()}`}>
+              <p>{result.recommendation}</p>
+            </div>
+          </div>
+
+          {/* Forensic Signal Metrics */}
+          {result.media_analysis && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <HardDrive size={18} color="var(--accent-color)" /> Forensic Sensor Metrics
+              </h3>
+              <div className="metrics-grid">
+                <div className="card metric-card">
+                  <span className="metric-label">Synthetic AI Probability</span>
+                  <span className="metric-val" style={{ color: result.media_analysis.deepfake_score > 0.5 ? '#f85149' : '#2ea043' }}>
+                    {(result.media_analysis.deepfake_score * 100).toFixed(0)}%
+                  </span>
+                  <div className="meter-bar">
+                    <div
+                      className="meter-fill"
+                      style={{
+                        width: `${result.media_analysis.deepfake_score * 100}%`,
+                        backgroundColor: result.media_analysis.deepfake_score > 0.5 ? '#f85149' : '#2ea043',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="card metric-card">
+                  <span className="metric-label">Biological Consistency</span>
+                  <span className="metric-val" style={{ color: '#58a6ff' }}>
+                    {(result.media_analysis.biological_signals_score * 100).toFixed(0)}%
+                  </span>
+                  <div className="meter-bar">
+                    <div className="meter-fill" style={{ width: `${result.media_analysis.biological_signals_score * 100}%`, backgroundColor: '#58a6ff' }} />
+                  </div>
+                </div>
+
+                <div className="card metric-card">
+                  <span className="metric-label">Physical Light Consistency</span>
+                  <span className="metric-val" style={{ color: '#a371f7' }}>
+                    {(result.media_analysis.physical_consistency_score * 100).toFixed(0)}%
+                  </span>
+                  <div className="meter-bar">
+                    <div className="meter-fill" style={{ width: `${result.media_analysis.physical_consistency_score * 100}%`, backgroundColor: '#a371f7' }} />
+                  </div>
+                </div>
+
+                <div className="card metric-card">
+                  <span className="metric-label">EXIF Authenticity</span>
+                  <span className="metric-val" style={{ color: '#d29922' }}>
+                    {(result.media_analysis.metadata_score * 100).toFixed(0)}%
+                  </span>
+                  <div className="meter-bar">
+                    <div className="meter-fill" style={{ width: `${result.media_analysis.metadata_score * 100}%`, backgroundColor: '#d29922' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Evidence */}
+          {result.evidence && result.evidence.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Search size={18} color="var(--accent-color)" /> Forensic Evidence Discovered ({result.evidence.length})
+              </h3>
+              <div className="evidence-grid">
+                {result.evidence.map((ev, index) => (
+                  <div key={index} className={`card evidence-card severity-${ev.severity || 'low'}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span className="evidence-type-badge">{ev.type.replace(/_/g, ' ')}</span>
+                      <span className="evidence-conf">{(ev.confidence * 100).toFixed(0)}% Confidence</span>
+                    </div>
+                    <p className="evidence-desc">{ev.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default ImageScanner;

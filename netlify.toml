@@ -1,0 +1,47 @@
+[build]
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = "dist"
+  functions = "../netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Route API requests to Netlify Serverless Functions
+[[redirects]]
+  from = "/api/analyze/text"
+  to = "/.netlify/functions/analyze_text"
+  status = 200
+
+[[redirects]]
+  from = "/api/analyze/image"
+  to = "/.netlify/functions/analyze_image"
+  status = 200
+
+[[redirects]]
+  from = "/api/analyze/video"
+  to = "/.netlify/functions/analyze_image"
+  status = 200
+
+[[redirects]]
+  from = "/api/analyze/url"
+  to = "/.netlify/functions/analyze_url"
+  status = 200
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

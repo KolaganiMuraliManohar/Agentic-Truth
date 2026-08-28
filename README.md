@@ -116,10 +116,39 @@ The UI will be accessible at `http://localhost:5173`.
 
 ---
 
+## 🌐 Netlify Zero-Config Deployment
+
+Agentic-Truth is pre-configured with `netlify.toml` and Netlify Serverless Functions for 1-click cloud deployment.
+
+### Option A: Via GitHub (Recommended)
+1. Push this repository to your GitHub account (`git push origin main`).
+2. Log into [Netlify](https://app.netlify.com) and click **"Add new site"** ➔ **"Import an existing project"**.
+3. Select this repository. Netlify will automatically detect:
+   - **Base directory:** `frontend`
+   - **Build command:** `npm run build`
+   - **Publish directory:** `frontend/dist`
+   - **Functions directory:** `netlify/functions`
+4. Click **Deploy Site** — your multi-agent forensic web app is immediately live!
+
+### Option B: Via Netlify CLI
+```bash
+# Install Netlify CLI if needed
+npm install -g netlify-cli
+
+# Login and deploy
+netlify login
+netlify init
+netlify deploy --prod
+```
+
+---
+
 ## 📊 Performance & Limits
 
 - **Text Latency:** ~2-4 seconds (Fast Path), ~8-15 seconds (Full Multi-Agent Debate).
-- **Vision Limitations:** System reliably detects face-swaps via NVIDIA Hive. Fully synthetic diffusion images trigger an "Uncertain" metadata warning flag rather than a definitive "Fake" score, due to current generation ViT limitations.
+- **Vision Limitations:** System reliably detects face-swaps via NVIDIA Hive and AI diffusion markers.
+- **Engine Modes:** Supports zero-config deterministic multi-agent heuristics + live cloud LLMs (Groq, Google Gemini, OpenAI, Tavily).
 
 ---
 *Built by Murali Manohar Kolagani as an advanced exploration into Agentic AI and Digital Forensics.*
+
