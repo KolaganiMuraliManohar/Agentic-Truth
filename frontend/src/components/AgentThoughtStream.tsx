@@ -5,11 +5,10 @@ import {
   ShieldAlert,
   ShieldCheck,
   Scale,
-  Search,
   MessageSquare,
-  Sparkles,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Award
 } from 'lucide-react';
 
 interface AgentThoughtStreamProps {
@@ -21,21 +20,17 @@ export const AgentThoughtStream: React.FC<AgentThoughtStreamProps> = ({
   thoughts,
   trace,
 }) => {
-  const [activeTab, setActiveTab] = useState<'stream' | 'debate'>('debate');
+  const [activeTab, setActiveTab] = useState<'debate' | 'stream'>('debate');
   const [isExpanded, setIsExpanded] = useState(true);
 
   const getThoughtIcon = (role: AgentThought['agentRole']) => {
     switch (role) {
-      case 'Prosecutor':
+      case 'FalseAgent':
         return <ShieldAlert size={14} color="#f85149" />;
-      case 'Defender':
+      case 'TrueAgent':
         return <ShieldCheck size={14} color="#2ea043" />;
-      case 'Judge':
+      case 'JudgeAgent':
         return <Scale size={14} color="#a371f7" />;
-      case 'Retriever':
-        return <Search size={14} color="#58a6ff" />;
-      case 'Extractor':
-        return <Sparkles size={14} color="#d29922" />;
       default:
         return <Terminal size={14} color="#8b949e" />;
     }
@@ -45,8 +40,13 @@ export const AgentThoughtStream: React.FC<AgentThoughtStreamProps> = ({
     <div className="thought-stream-card">
       <div className="thought-stream-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Terminal size={18} color="var(--accent-color)" />
-          <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Agent Deliberation & Thought Stream</h3>
+          <Scale size={20} color="var(--accent-color)" />
+          <div>
+            <h3 style={{ fontSize: '1.1rem', margin: 0 }}>3-Agent Deliberation & Dialectic Debate</h3>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              True Agent vs False Agent ➔ The Judge synthesis
+            </span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -55,13 +55,13 @@ export const AgentThoughtStream: React.FC<AgentThoughtStreamProps> = ({
               className={`stream-tab-btn ${activeTab === 'debate' ? 'active' : ''}`}
               onClick={() => setActiveTab('debate')}
             >
-              <Scale size={14} /> Parallel Debate
+              <Scale size={14} /> 3-Agent Debate
             </button>
             <button
               className={`stream-tab-btn ${activeTab === 'stream' ? 'active' : ''}`}
               onClick={() => setActiveTab('stream')}
             >
-              <MessageSquare size={14} /> Live Trace ({thoughts.length})
+              <MessageSquare size={14} /> Live Thought Stream ({thoughts.length})
             </button>
           </div>
 
@@ -77,53 +77,89 @@ export const AgentThoughtStream: React.FC<AgentThoughtStreamProps> = ({
 
       {isExpanded && (
         <div className="thought-stream-body">
-          {activeTab === 'debate' && trace?.prosecutorCase && trace?.defenderCase ? (
-            <div className="debate-grid">
-              {/* Prosecutor Column */}
-              <div className="debate-box prosecutor-box">
-                <div className="debate-box-header">
-                  <ShieldAlert size={18} color="#f85149" />
-                  <h4>Prosecutor Agent (Adversarial Case)</h4>
-                  <span className="risk-tag">
-                    Risk: {(trace.prosecutorCase.riskScore * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <p className="debate-argument">{trace.prosecutorCase.argument}</p>
-
-                {trace.prosecutorCase.redFlags.length > 0 && (
-                  <div className="debate-list-section">
-                    <span className="debate-list-title">Flagged Red Flags:</span>
-                    <ul>
-                      {trace.prosecutorCase.redFlags.map((flag, i) => (
-                        <li key={i}>{flag}</li>
-                      ))}
-                    </ul>
+          {activeTab === 'debate' && trace?.trueAgentCase && trace?.falseAgentCase ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Opponent Row */}
+              <div className="debate-grid">
+                {/* True Agent Case */}
+                <div className="debate-box defender-box">
+                  <div className="debate-box-header">
+                    <ShieldCheck size={18} color="#2ea043" />
+                    <div>
+                      <h4 style={{ color: '#3fb950' }}>True Agent (Claims TRUE & Searches)</h4>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        {trace.trueAgentCase.searchStrategy}
+                      </span>
+                    </div>
+                    <span className="auth-tag">
+                      Support: {(trace.trueAgentCase.credibilityScore * 100).toFixed(0)}%
+                    </span>
                   </div>
-                )}
+                  <p className="debate-argument">{trace.trueAgentCase.argument}</p>
+
+                  {trace.trueAgentCase.supportingEvidence.length > 0 && (
+                    <div className="debate-list-section">
+                      <span className="debate-list-title">Supporting Citations Found:</span>
+                      <ul>
+                        {trace.trueAgentCase.supportingEvidence.map((factor, i) => (
+                          <li key={i}>{factor}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* False Agent Case */}
+                <div className="debate-box prosecutor-box">
+                  <div className="debate-box-header">
+                    <ShieldAlert size={18} color="#f85149" />
+                    <div>
+                      <h4 style={{ color: '#f85149' }}>False Agent (Claims FALSE & Searches)</h4>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        {trace.falseAgentCase.searchStrategy}
+                      </span>
+                    </div>
+                    <span className="risk-tag">
+                      Deception: {(trace.falseAgentCase.deceptionScore * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="debate-argument">{trace.falseAgentCase.argument}</p>
+
+                  {trace.falseAgentCase.refutingEvidence.length > 0 && (
+                    <div className="debate-list-section">
+                      <span className="debate-list-title">Debunk & Refuting Points Found:</span>
+                      <ul>
+                        {trace.falseAgentCase.refutingEvidence.map((flag, i) => (
+                          <li key={i}>{flag}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Defender Column */}
-              <div className="debate-box defender-box">
-                <div className="debate-box-header">
-                  <ShieldCheck size={18} color="#2ea043" />
-                  <h4>Defender Agent (Authenticity Case)</h4>
-                  <span className="auth-tag">
-                    Auth: {(trace.defenderCase.authenticityScore * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <p className="debate-argument">{trace.defenderCase.argument}</p>
-
-                {trace.defenderCase.corroboratingFactors.length > 0 && (
-                  <div className="debate-list-section">
-                    <span className="debate-list-title">Corroborating Evidence:</span>
-                    <ul>
-                      {trace.defenderCase.corroboratingFactors.map((factor, i) => (
-                        <li key={i}>{factor}</li>
-                      ))}
-                    </ul>
+              {/* The Judge Agent Synthesis & Borrowed Decision */}
+              {trace.judgeSynthesis && (
+                <div className="judge-decision-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <Award size={20} color="#a371f7" />
+                    <h4 style={{ fontSize: '1.05rem', margin: 0, color: '#a371f7' }}>
+                      The Judge Agent Decision & Borrowed Reasoning
+                    </h4>
                   </div>
-                )}
-              </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '0.5rem' }}>
+                    <strong>Ruling:</strong> {trace.judgeSynthesis.whyWon}
+                  </p>
+                  <div className="borrowed-rationale-box">
+                    <span style={{ fontSize: '0.8rem', color: '#a371f7', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>
+                      Borrowed Reasoning from Prevailing Agent:
+                    </span>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, fontStyle: 'italic' }}>
+                      {trace.judgeSynthesis.borrowedRationale}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="terminal-logs">
@@ -146,7 +182,7 @@ export const AgentThoughtStream: React.FC<AgentThoughtStreamProps> = ({
               ))}
               {thoughts.length === 0 && (
                 <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', padding: '1rem 0' }}>
-                  No agent thoughts recorded yet. Run a scan to see live LangGraph execution logs.
+                  No agent thoughts recorded yet. Run a scan to see the 3 agents debate in real-time.
                 </p>
               )}
             </div>

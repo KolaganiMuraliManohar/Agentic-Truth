@@ -1,6 +1,9 @@
 /**
  * Agentic-Truth Types & Schemas
- * Comprehensive type definitions for Multi-Agent LangGraph System
+ * 3-Agent Adversarial LangGraph Architecture:
+ * - True Agent (Advocate / Affirmative Search)
+ * - False Agent (Prosecutor / Debunk Search)
+ * - Judge Agent (Decider / Synthesis with Borrowed Reasoning)
  */
 
 export type Verdict = 'LIKELY_FAKE' | 'LIKELY_REAL' | 'UNCERTAIN';
@@ -14,6 +17,7 @@ export interface Evidence {
   severity: Severity;
   source_url?: string;
   proof_quote?: string;
+  advocacy_side?: 'true' | 'false' | 'neutral';
 }
 
 export interface BoundingBox {
@@ -84,7 +88,7 @@ export interface DetectionResult {
 export interface AgentNodeState {
   id: string;
   name: string;
-  description: string;
+  roleDescription: string;
   status: NodeStatus;
   startedAt?: number;
   completedAt?: number;
@@ -95,7 +99,7 @@ export interface AgentNodeState {
 
 export interface AgentThought {
   agentName: string;
-  agentRole: 'Extractor' | 'Retriever' | 'Prosecutor' | 'Defender' | 'Judge' | 'Forensic' | 'Supervisor';
+  agentRole: 'TrueAgent' | 'FalseAgent' | 'JudgeAgent' | 'Forensic';
   timestamp: number;
   thought: string;
   confidence?: number;
@@ -107,17 +111,26 @@ export interface AgentExecutionTrace {
   totalDurationMs: number;
   nodes: AgentNodeState[];
   thoughts: AgentThought[];
-  prosecutorCase?: {
+  trueAgentCase?: {
+    verdictHypothesis: 'TRUE';
+    searchStrategy: string;
+    supportingEvidence: string[];
+    credibilityScore: number;
     argument: string;
-    redFlags: string[];
-    riskScore: number;
   };
-  defenderCase?: {
+  falseAgentCase?: {
+    verdictHypothesis: 'FALSE';
+    searchStrategy: string;
+    refutingEvidence: string[];
+    deceptionScore: number;
     argument: string;
-    corroboratingFactors: string[];
-    authenticityScore: number;
   };
-  judgeDebateSummary?: string;
+  judgeSynthesis?: {
+    decision: Verdict;
+    borrowedRationale: string;
+    whyWon: string;
+    confidence: number;
+  };
 }
 
 export interface ApiSettings {
