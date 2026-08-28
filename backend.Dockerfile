@@ -1,9 +1,9 @@
 FROM python:3.11-slim
 
-# Install system dependencies (needed for OpenCV, dlib, and building some python packages)
+# Install system dependencies (needed for OpenCV and building some python packages)
 RUN apt-get update && apt-get install -y \
     build-essential \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,7 +24,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy the source code
 COPY ./src ./src
-COPY ./config.py ./config.py
 
 # Set environment variables
 ENV PYTHONPATH=/app

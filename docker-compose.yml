@@ -1,6 +1,28 @@
 version: '3.8'
 
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    container_name: msm_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    depends_on:
+      - neo4j
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    container_name: msm_frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
   neo4j:
     image: neo4j:5.14.0
     container_name: msm_neo4j
