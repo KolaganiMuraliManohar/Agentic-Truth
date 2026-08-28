@@ -7,6 +7,8 @@ import {
   Scale,
   Sparkles,
   ExternalLink,
+  ShieldCheck,
+  ShieldAlert,
   Flame
 } from 'lucide-react';
 import { DetectionResult, AgentNodeState, AgentThought } from '../types/agent';
@@ -16,19 +18,19 @@ import { AgentThoughtStream } from '../components/AgentThoughtStream';
 
 const PRESET_CLAIMS = [
   {
-    title: 'Viral Misinformation',
-    text: 'SHOCKING: Secret government report admits 5G radiation weakens human immune systems and causes viral mutations! Doctors are being silenced!',
-    url: 'https://conspiracydaily.example.com/5g-leak',
+    title: 'Actor Yash in Baahubali',
+    text: 'hero yash acted in bahubali',
+    url: '',
   },
   {
-    title: 'Authoritative News',
-    text: 'NASA researchers have successfully confirmed the detection of organic molecules in rock samples collected by the Perseverance rover on Mars.',
-    url: 'https://www.nasa.gov/news/perseverance-mars-organic-discovery',
+    title: 'Viral 5G Claim',
+    text: 'Secret government report admits 5G radiation weakens human immune systems and causes viral mutations! Doctors are being silenced!',
+    url: '',
   },
   {
-    title: 'Unverified Rumor',
-    text: 'Leaked internal memo suggests tech giant is preparing to replace 40% of customer support personnel with autonomous AI agents by Q4.',
-    url: 'https://techrumorhub.example.org/ai-layoffs',
+    title: 'NASA Mars Discovery',
+    text: 'NASA researchers confirmed the detection of organic molecules in rock samples on Mars.',
+    url: 'https://nasa.gov',
   },
 ];
 
@@ -53,7 +55,6 @@ const TextScanner: React.FC = () => {
     setProgress(0);
 
     try {
-      // Execute the multi-agent LangGraph system
       const res = await agentGraphService.executeTextGraph(inputValue, sourceUrl || undefined, {
         onNodeStart: (node) => {
           setNodes((prev) => {
@@ -98,20 +99,20 @@ const TextScanner: React.FC = () => {
     switch (verdict.toUpperCase()) {
       case 'LIKELY_FAKE':
         return (
-          <span className="status-badge status-fake">
-            <XCircle size={16} /> Likely Misinformation
+          <span className="status-badge status-fake" style={{ fontSize: '1.1rem', padding: '0.5rem 1.25rem' }}>
+            <XCircle size={20} /> FALSE
           </span>
         );
       case 'LIKELY_REAL':
         return (
-          <span className="status-badge status-real">
-            <CheckCircle size={16} /> Verified Authentic
+          <span className="status-badge status-real" style={{ fontSize: '1.1rem', padding: '0.5rem 1.25rem' }}>
+            <CheckCircle size={20} /> TRUE
           </span>
         );
       default:
         return (
-          <span className="status-badge status-uncertain">
-            <AlertTriangle size={16} /> Inconclusive / Uncertain
+          <span className="status-badge status-uncertain" style={{ fontSize: '1.1rem', padding: '0.5rem 1.25rem' }}>
+            <AlertTriangle size={20} /> UNCERTAIN
           </span>
         );
     }
@@ -119,20 +120,20 @@ const TextScanner: React.FC = () => {
 
   return (
     <div className="content-wrapper">
-      {/* Top Banner */}
+      {/* Input Header */}
       <div className="glass-panel text-scanner-hero">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <Scale size={28} color="var(--accent-color)" />
-          <h1 style={{ fontSize: '1.85rem', margin: 0 }}>Multi-Agent Text Forensics</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+          <Scale size={26} color="var(--accent-color)" />
+          <h1 style={{ fontSize: '1.75rem', margin: 0 }}>Agentic Truth Check</h1>
         </div>
-        <p style={{ maxWidth: '850px', marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
-          Autonomous multi-agent verification orchestrated with <strong>LangGraph</strong>. Claims are extracted, cross-referenced, and debated in parallel by <strong>Prosecutor</strong> and <strong>Defender</strong> agents before receiving a synthesis verdict by <strong>The Judge</strong>.
+        <p style={{ marginBottom: '1.25rem', color: 'var(--text-secondary)' }}>
+          3-Agent Adversarial System: <strong>True Agent</strong> (Says TRUE & searches) vs <strong>False Agent</strong> (Says FALSE & searches) ➔ <strong>The Judge Agent</strong> (Decides based on verified proof).
         </p>
 
-        {/* Preset selector */}
+        {/* Quick Presets */}
         <div className="preset-bar">
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Flame size={14} color="#f0883e" /> Quick Presets:
+            <Flame size={14} color="#f0883e" /> Try Claim:
           </span>
           {PRESET_CLAIMS.map((p, idx) => (
             <button key={idx} className="preset-pill" onClick={() => loadPreset(p)}>
@@ -141,23 +142,23 @@ const TextScanner: React.FC = () => {
           ))}
         </div>
 
-        {/* Input area */}
-        <div style={{ marginTop: '1.25rem' }}>
+        {/* Text Input */}
+        <div style={{ marginTop: '1rem' }}>
           <textarea
             className="input-area"
-            rows={4}
-            placeholder="Paste suspicious text, news claims, or social media statements here..."
+            rows={3}
+            placeholder="Enter any claim or statement (e.g. 'hero yash acted in bahubali')..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', alignItems: 'center' }}>
           <input
             type="url"
             className="text-input"
             style={{ flex: 1 }}
-            placeholder="Optional Source URL (e.g., https://reuters.com/...)"
+            placeholder="Optional Source Link"
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
           />
@@ -165,15 +166,15 @@ const TextScanner: React.FC = () => {
             className="btn btn-primary"
             onClick={handleScan}
             disabled={isScanning || !inputValue.trim()}
-            style={{ minWidth: '190px' }}
+            style={{ minWidth: '180px' }}
           >
             {isScanning ? (
               <>
-                <Search className="spinner" size={18} /> Running LangGraph...
+                <Search className="spinner" size={18} /> Verifying...
               </>
             ) : (
               <>
-                <Sparkles size={18} /> Execute Agent Graph
+                <Sparkles size={18} /> Verify Claim
               </>
             )}
           </button>
@@ -187,9 +188,9 @@ const TextScanner: React.FC = () => {
         )}
       </div>
 
-      {/* LangGraph Visualizer */}
+      {/* Visualizer */}
       {(isScanning || nodes.length > 0) && (
-        <div className="glass-panel" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
+        <div className="glass-panel" style={{ padding: '1.25rem' }}>
           <AgentGraphVisualizer
             nodes={nodes}
             isExecuting={isScanning}
@@ -199,118 +200,110 @@ const TextScanner: React.FC = () => {
         </div>
       )}
 
-      {/* Thought Stream & Debate Logs */}
+      {/* Thought Stream */}
       {(isScanning || thoughts.length > 0) && (
-        <div style={{ marginTop: '1.5rem' }}>
+        <div>
           <AgentThoughtStream thoughts={thoughts} trace={result?.execution_trace} />
         </div>
       )}
 
-      {/* Results Dashboard */}
+      {/* Clean, Direct Result Section */}
       {result && (
-        <div className="glass-panel animate-fade-in" style={{ marginTop: '1.5rem', padding: '2rem' }}>
-          <div className="results-header">
+        <div className="glass-panel animate-fade-in" style={{ padding: '1.75rem' }}>
+          <div className="results-header" style={{ alignItems: 'center' }}>
             <div>
-              <h2 style={{ fontSize: '1.6rem', marginBottom: '0.4rem' }}>Ensemble Forensics Report</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginTop: '0.5rem' }}>
-                <span className="metric-pill">
-                  Confidence: <strong>{(result.confidence * 100).toFixed(1)}%</strong>
-                </span>
-                <span className="metric-pill">
-                  Uncertainty: <strong>{(result.uncertainty * 100).toFixed(1)}%</strong>
-                </span>
-                {result.execution_trace?.totalDurationMs && (
-                  <span className="metric-pill">
-                    Latency: <strong>{result.execution_trace.totalDurationMs}ms</strong>
-                  </span>
-                )}
-              </div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Final Decision
+              </span>
+              <h2 style={{ fontSize: '1.4rem', margin: '0.2rem 0' }}>
+                {result.verdict === 'LIKELY_FAKE'
+                  ? 'Claim is FALSE'
+                  : result.verdict === 'LIKELY_REAL'
+                  ? 'Claim is TRUE'
+                  : 'Claim is UNCERTAIN'}
+              </h2>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Confidence: <strong>{(result.confidence * 100).toFixed(0)}%</strong> • Latency: {result.execution_trace?.totalDurationMs}ms
+              </span>
             </div>
             <div>{renderVerdictBadge(result.verdict)}</div>
           </div>
 
-          {/* Recommendation Box */}
-          <div style={{ margin: '1.75rem 0' }}>
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Synthesis & Operational Guidance</h3>
+          {/* Judge Ruling */}
+          <div style={{ margin: '1.25rem 0' }}>
             <div className={`recommendation-card ${result.verdict.toLowerCase()}`}>
-              <p>{result.recommendation}</p>
+              <strong style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.95rem' }}>
+                {result.recommendation}
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                {result.execution_trace?.judgeSynthesis?.whyWon}
+              </p>
             </div>
           </div>
 
-          {/* Extracted Claims */}
-          {result.text_analysis?.claims && result.text_analysis.claims.length > 0 && (
-            <div style={{ marginBottom: '1.75rem' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Sparkles size={18} color="var(--accent-color)" /> Decomposed Claims ({result.text_analysis.claims.length})
-              </h3>
-              <div className="claims-list">
-                {result.text_analysis.claims.map((claim, idx) => (
-                  <div key={idx} className="claim-item">
-                    <span className="claim-number">#{idx + 1}</span>
-                    <span className="claim-text">{claim}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Direct Proof / References from both agents */}
+          <div style={{ marginTop: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Search size={16} color="var(--accent-color)" /> Referenced Proofs & Evidence
+            </h3>
 
-          {/* 3-Part IFAI Rationale Dashboard */}
-          {result.text_analysis && (
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Scale size={18} color="#a371f7" /> 3-Part Forensic Assessment
-              </h3>
-              <div className="ifai-grid">
-                <div className="card ifai-card ifai-style">
-                  <h4>1. Linguistic & Style Profile</h4>
-                  <p>{result.text_analysis.ifai_style || 'Adheres to standard syntactic structure.'}</p>
-                </div>
-                <div className="card ifai-card ifai-content">
-                  <h4>2. Empirical Content Grounding</h4>
-                  <p>{result.text_analysis.ifai_content || 'Grounded against institutional consensus.'}</p>
-                </div>
-                <div className="card ifai-card ifai-consistency">
-                  <h4>3. Cross-Source Consistency</h4>
-                  <p>{result.text_analysis.ifai_consistency || 'Evaluated across multi-registry index.'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Evidence Cards */}
-          {result.evidence && result.evidence.length > 0 && (
-            <div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Search size={18} color="var(--accent-color)" /> Grounded Evidence & Citations ({result.evidence.length})
-              </h3>
-              <div className="evidence-grid">
-                {result.evidence.map((ev, index) => (
-                  <div key={index} className={`card evidence-card severity-${ev.severity || 'low'}`}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <span className="evidence-type-badge">{ev.type.replace(/_/g, ' ')}</span>
-                      <span className="evidence-conf">{(ev.confidence * 100).toFixed(0)}% Match</span>
-                    </div>
-                    <p className="evidence-desc">{ev.description}</p>
-                    {ev.proof_quote && (
-                      <div className="evidence-quote">
-                        <em>"{ev.proof_quote}"</em>
-                      </div>
-                    )}
-                    {ev.source_url && (
-                      <a
-                        href={ev.source_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="evidence-link"
-                      >
-                        <ExternalLink size={13} /> {ev.source_url}
-                      </a>
-                    )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* False Agent Proof (if any) */}
+              {result.execution_trace?.falseAgentCase?.hasProof && result.execution_trace.falseAgentCase.refutingEvidence && (
+                <div className="card" style={{ borderLeft: '4px solid #f85149', background: 'rgba(248, 81, 73, 0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f85149', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                    <ShieldAlert size={16} /> False Agent Counter-Proof
                   </div>
-                ))}
-              </div>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                    {result.execution_trace.falseAgentCase.argument}
+                  </p>
+                  {result.execution_trace.falseAgentCase.proofUrl && (
+                    <a
+                      href={result.execution_trace.falseAgentCase.proofUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="evidence-link"
+                      style={{ marginTop: '0.5rem' }}
+                    >
+                      <ExternalLink size={13} /> Reference Source: {result.execution_trace.falseAgentCase.proofUrl}
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* True Agent Proof (if any) */}
+              {result.execution_trace?.trueAgentCase?.hasProof && (
+                <div className="card" style={{ borderLeft: '4px solid #2ea043', background: 'rgba(46, 160, 67, 0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#2ea043', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                    <ShieldCheck size={16} /> True Agent Supporting Proof
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                    {result.execution_trace.trueAgentCase.argument}
+                  </p>
+                  {result.execution_trace.trueAgentCase.proofUrl && (
+                    <a
+                      href={result.execution_trace.trueAgentCase.proofUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="evidence-link"
+                      style={{ marginTop: '0.5rem' }}
+                    >
+                      <ExternalLink size={13} /> Reference Source: {result.execution_trace.trueAgentCase.proofUrl}
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* If neither had proof */}
+              {!result.execution_trace?.falseAgentCase?.hasProof && !result.execution_trace?.trueAgentCase?.hasProof && (
+                <div className="card" style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                    No definitive public citations or debunk matches were found in indexed registries for this specific claim.
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

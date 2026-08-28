@@ -117,6 +117,8 @@ export interface AgentExecutionTrace {
     supportingEvidence: string[];
     credibilityScore: number;
     argument: string;
+    hasProof?: boolean;
+    proofUrl?: string;
   };
   falseAgentCase?: {
     verdictHypothesis: 'FALSE';
@@ -124,6 +126,8 @@ export interface AgentExecutionTrace {
     refutingEvidence: string[];
     deceptionScore: number;
     argument: string;
+    hasProof?: boolean;
+    proofUrl?: string;
   };
   judgeSynthesis?: {
     decision: Verdict;

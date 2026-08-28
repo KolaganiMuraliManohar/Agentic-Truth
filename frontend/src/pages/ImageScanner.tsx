@@ -97,7 +97,7 @@ const ImageScanner: React.FC = () => {
 
     try {
       const res = await agentGraphService.executeMediaGraph(file, {
-        onNodeStart: (node) => {
+        onNodeStart: (node: AgentNodeState) => {
           setNodes((prev) => {
             const existing = prev.find((n) => n.id === node.id);
             if (existing) {
@@ -106,13 +106,13 @@ const ImageScanner: React.FC = () => {
             return [...prev, { ...node }];
           });
         },
-        onNodeComplete: (node) => {
+        onNodeComplete: (node: AgentNodeState) => {
           setNodes((prev) => prev.map((n) => (n.id === node.id ? { ...node } : n)));
         },
-        onThought: (thought) => {
+        onThought: (thought: AgentThought) => {
           setThoughts((prev) => [...prev, thought]);
         },
-        onProgress: (pct, msg) => {
+        onProgress: (pct: number, msg: string) => {
           setProgress(pct);
           setProgressMsg(msg);
         },
