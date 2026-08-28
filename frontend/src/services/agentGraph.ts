@@ -68,15 +68,88 @@ export class MultiAgentLangGraphEngine {
   }
 
   /**
-   * Search Wikipedia with composite queries and retrieve real factual excerpts
+   * Multi-Source Live Web & Knowledge Search (Tavily AI, DuckDuckGo, Wikipedia)
+   * Retrieves real-time news, fact-checking registries, and live web sources.
    */
-  private async fetchFactualContext(claim: string): Promise<{ title: string; extract: string; url: string }[]> {
+  private async fetchFactualContext(claim: string): Promise<{ title: string; extract: string; url: string; source: string }[]> {
+    const results: { title: string; extract: string; url: string; source: string }[] = [];
+
+    // 1. Tavily AI Search (Live Web, News, Fact-Check Databases)
+    const tavilyKey = this.settings.tavilyApiKey || (import.meta as any).env?.VITE_TAVILY_API_KEY;
+    if (tavilyKey) {
+      try {
+        const tavilyRes = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: tavilyKey,
+            query: claim,
+            search_depth: 'advanced',
+            include_answer: true,
+            max_results: 5,
+          }),
+        });
+        if (tavilyRes.ok) {
+          const tavilyData = await tavilyRes.json();
+          if (tavilyData.answer) {
+            results.push({
+              title: 'Tavily AI Fact Synthesis',
+              extract: tavilyData.answer,
+              url: tavilyData.results?.[0]?.url || 'https://tavily.com',
+              source: 'Live Web Search (Tavily)',
+            });
+          }
+          if (Array.isArray(tavilyData.results)) {
+            for (const r of tavilyData.results) {
+              results.push({
+                title: r.title || 'Web Source',
+                extract: r.content || '',
+                url: r.url,
+                source: 'Live Web Search',
+              });
+            }
+          }
+        }
+      } catch {
+        // continue to other search sources
+      }
+    }
+
+    // 2. DuckDuckGo Instant Real-Time Knowledge & News Search
     try {
-      // Strip punctuation for search
+      const ddgEndpoint = `https://api.duckduckgo.com/?q=${encodeURIComponent(claim)}&format=json&no_html=1&skip_disambig=1`;
+      const ddgRes = await fetch(ddgEndpoint, { signal: AbortSignal.timeout(3500) });
+      if (ddgRes.ok) {
+        const ddgData = await ddgRes.json();
+        if (ddgData.AbstractText) {
+          results.push({
+            title: ddgData.Heading || 'DuckDuckGo Knowledge Graph',
+            extract: ddgData.AbstractText,
+            url: ddgData.AbstractURL || 'https://duckduckgo.com',
+            source: 'DuckDuckGo Instant Answer',
+          });
+        }
+        if (Array.isArray(ddgData.RelatedTopics)) {
+          for (const topic of ddgData.RelatedTopics.slice(0, 3)) {
+            if (topic.Text && topic.FirstURL) {
+              results.push({
+                title: topic.Text.slice(0, 50) + '...',
+                extract: topic.Text,
+                url: topic.FirstURL,
+                source: 'DuckDuckGo Knowledge Registry',
+              });
+            }
+          }
+        }
+      }
+    } catch {
+      // continue to Wikipedia
+    }
+
+    // 3. Wikipedia Encyclopedic Knowledge Search
+    try {
       const cleanClaim = claim.replace(/[^\w\s]/gi, ' ').trim();
       const words = cleanClaim.split(/\s+/).filter(Boolean);
-
-      // Search queries: Full claim, key phrases
       const queries = [
         claim,
         words.slice(0, 4).join(' '),
@@ -88,48 +161,45 @@ export class MultiAgentLangGraphEngine {
         const endpoint = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
           q
         )}&format=json&origin=*&utf8=1&srlimit=3`;
-        const res = await fetch(endpoint, { signal: AbortSignal.timeout(4000) });
+        const res = await fetch(endpoint, { signal: AbortSignal.timeout(3500) });
         if (!res.ok) return [];
         const data = await res.json();
         return data?.query?.search || [];
       });
 
       const searchHits = (await Promise.all(searchPromises)).flat();
-      if (searchHits.length === 0) return [];
-
-      // Discard generic concept/dictionary titles
       const discardList = new Set(['Son', 'Father', 'Mother', 'Daughter', 'Child', 'Actor', 'Film', 'Human', 'President']);
       const uniqueTitles = Array.from(
         new Set(searchHits.map((h: any) => h.title).filter((t: string) => !discardList.has(t) && !t.includes('(disambiguation)')))
       ).slice(0, 4);
 
-      if (uniqueTitles.length === 0) return [];
+      if (uniqueTitles.length > 0) {
+        const extractEndpoint = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext&exchars=1200&titles=${encodeURIComponent(
+          uniqueTitles.join('|')
+        )}&format=json&origin=*&utf8=1`;
 
-      // Fetch page extracts (lead section plain text)
-      const extractEndpoint = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext&exchars=1200&titles=${encodeURIComponent(
-        uniqueTitles.join('|')
-      )}&format=json&origin=*&utf8=1`;
-
-      const extRes = await fetch(extractEndpoint, { signal: AbortSignal.timeout(4000) });
-      if (!extRes.ok) return [];
-      const extData = await extRes.json();
-      const pages = extData?.query?.pages || {};
-
-      const articles: { title: string; extract: string; url: string }[] = [];
-      for (const pid in pages) {
-        const p = pages[pid];
-        if (p.title && p.extract) {
-          articles.push({
-            title: p.title,
-            extract: p.extract,
-            url: `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
-          });
+        const extRes = await fetch(extractEndpoint, { signal: AbortSignal.timeout(3500) });
+        if (extRes.ok) {
+          const extData = await extRes.json();
+          const pages = extData?.query?.pages || {};
+          for (const pid in pages) {
+            const p = pages[pid];
+            if (p.title && p.extract) {
+              results.push({
+                title: p.title,
+                extract: p.extract,
+                url: `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
+                source: 'Wikipedia Encyclopedia',
+              });
+            }
+          }
         }
       }
-      return articles;
     } catch {
-      return [];
+      // ignore
     }
+
+    return results;
   }
 
   /**
