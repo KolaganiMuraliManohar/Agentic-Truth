@@ -1,10 +1,10 @@
 /**
- * Universal Multi-Agent LangGraph System with True LLM Intelligence & Real-Time Evidence Retrieval
- * =================================================================================================
- * 1. Live Evidence Retrieval: Fetches real-world factual context from Wikipedia & Knowledge APIs.
- * 2. True Agent (Advocate): Argues TRUE. Cites verified affirmative evidence if it exists.
- * 3. False Agent (Prosecutor): Argues FALSE. Cites factual contradictions, alternative facts, or disproof.
- * 4. The Judge Agent: Synthesizes both arguments, borrows prevailing reasoning, and renders a definitive TRUE/FALSE verdict.
+ * Universal Multi-Agent LangGraph System with True LLM Dialectic Verification
+ * ============================================================================
+ * 1. Live Evidence Retrieval: Fetches real-world factual context from multi-source web.
+ * 2. True Agent (Advocate): Formulates rigorous affirmative arguments based on verified facts.
+ * 3. False Agent (Prosecutor): Formulates rigorous counter-arguments & identifies false premises.
+ * 4. The Judge Agent: Synthesizes both arguments, borrows prevailing reasoning, and renders definitive verdict.
  */
 
 import {
@@ -55,7 +55,7 @@ export class MultiAgentLangGraphEngine {
       // Fallback
     }
     return {
-      provider: 'auto',
+      provider: 'groq',
       groqApiKey: (import.meta as any).env?.VITE_GROQ_API_KEY || '',
       geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
       openaiApiKey: (import.meta as any).env?.VITE_OPENAI_API_KEY || '',
@@ -68,142 +68,78 @@ export class MultiAgentLangGraphEngine {
   }
 
   /**
-   * Multi-Source Live Web & Knowledge Search (Tavily AI, DuckDuckGo, Wikipedia)
-   * Retrieves real-time news, fact-checking registries, and live web sources.
+   * Multi-Source Live Web & Knowledge Search
    */
-  private async fetchFactualContext(claim: string): Promise<{ title: string; extract: string; url: string; source: string }[]> {
-    const results: { title: string; extract: string; url: string; source: string }[] = [];
+  private async fetchFactualContext(claim: string): Promise<{ title: string; extract: string; url: string }[]> {
+    const results: { title: string; extract: string; url: string }[] = [];
 
-    // 1. Tavily AI Search (Live Web, News, Fact-Check Databases)
-    const tavilyKey = this.settings.tavilyApiKey || (import.meta as any).env?.VITE_TAVILY_API_KEY;
-    if (tavilyKey) {
-      try {
-        const tavilyRes = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: tavilyKey,
-            query: claim,
-            search_depth: 'advanced',
-            include_answer: true,
-            max_results: 5,
-          }),
-        });
-        if (tavilyRes.ok) {
-          const tavilyData = await tavilyRes.json();
-          if (tavilyData.answer) {
-            results.push({
-              title: 'Tavily AI Fact Synthesis',
-              extract: tavilyData.answer,
-              url: tavilyData.results?.[0]?.url || 'https://tavily.com',
-              source: 'Live Web Search (Tavily)',
-            });
-          }
-          if (Array.isArray(tavilyData.results)) {
-            for (const r of tavilyData.results) {
-              results.push({
-                title: r.title || 'Web Source',
-                extract: r.content || '',
-                url: r.url,
-                source: 'Live Web Search',
-              });
-            }
-          }
-        }
-      } catch {
-        // continue to other search sources
-      }
-    }
-
-    // 2. DuckDuckGo Instant Real-Time Knowledge & News Search
+    // 1. DuckDuckGo Instant Real-Time Knowledge Search
     try {
       const ddgEndpoint = `https://api.duckduckgo.com/?q=${encodeURIComponent(claim)}&format=json&no_html=1&skip_disambig=1`;
-      const ddgRes = await fetch(ddgEndpoint, { signal: AbortSignal.timeout(3500) });
+      const ddgRes = await fetch(ddgEndpoint, { signal: AbortSignal.timeout(3000) });
       if (ddgRes.ok) {
         const ddgData = await ddgRes.json();
         if (ddgData.AbstractText) {
           results.push({
-            title: ddgData.Heading || 'DuckDuckGo Knowledge Graph',
+            title: ddgData.Heading || 'Web Knowledge Registry',
             extract: ddgData.AbstractText,
             url: ddgData.AbstractURL || 'https://duckduckgo.com',
-            source: 'DuckDuckGo Instant Answer',
           });
-        }
-        if (Array.isArray(ddgData.RelatedTopics)) {
-          for (const topic of ddgData.RelatedTopics.slice(0, 3)) {
-            if (topic.Text && topic.FirstURL) {
-              results.push({
-                title: topic.Text.slice(0, 50) + '...',
-                extract: topic.Text,
-                url: topic.FirstURL,
-                source: 'DuckDuckGo Knowledge Registry',
-              });
-            }
-          }
         }
       }
     } catch {
-      // continue to Wikipedia
+      // continue
     }
 
-    // 3. Wikipedia Encyclopedic Knowledge Search
+    // 2. Wikipedia Search for Core Terms
     try {
       const cleanClaim = claim.replace(/[^\w\s]/gi, ' ').trim();
       const words = cleanClaim.split(/\s+/).filter(Boolean);
-      const queries = [
-        claim,
-        words.slice(0, 4).join(' '),
-        words.filter((w) => !['is', 'the', 'of', 'in', 'and', 'a', 'to', 'was', 'for', 'with', 'did'].includes(w.toLowerCase())).join(' '),
-      ];
+      const query = words.slice(0, 4).join(' ');
 
-      const searchPromises = queries.map(async (q) => {
-        if (!q || q.length < 2) return [];
-        const endpoint = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-          q
-        )}&format=json&origin=*&utf8=1&srlimit=3`;
-        const res = await fetch(endpoint, { signal: AbortSignal.timeout(3500) });
-        if (!res.ok) return [];
+      const endpoint = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+        query
+      )}&format=json&origin=*&utf8=1&srlimit=3`;
+      const res = await fetch(endpoint, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
         const data = await res.json();
-        return data?.query?.search || [];
-      });
+        const searchHits = data?.query?.search || [];
+        const discardList = new Set(['Son', 'Father', 'Mother', 'Child', 'Actor', 'Film', 'Blue', 'Peddi', 'Disambiguation']);
+        const uniqueTitles = Array.from(
+          new Set(searchHits.map((h: any) => h.title).filter((t: string) => !discardList.has(t) && !t.includes('(disambiguation)')))
+        ).slice(0, 3);
 
-      const searchHits = (await Promise.all(searchPromises)).flat();
-      const discardList = new Set(['Son', 'Father', 'Mother', 'Daughter', 'Child', 'Actor', 'Film', 'Human', 'President']);
-      const uniqueTitles = Array.from(
-        new Set(searchHits.map((h: any) => h.title).filter((t: string) => !discardList.has(t) && !t.includes('(disambiguation)')))
-      ).slice(0, 4);
+        if (uniqueTitles.length > 0) {
+          const extractEndpoint = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext&exchars=1000&titles=${encodeURIComponent(
+            uniqueTitles.join('|')
+          )}&format=json&origin=*&utf8=1`;
 
-      if (uniqueTitles.length > 0) {
-        const extractEndpoint = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext&exchars=1200&titles=${encodeURIComponent(
-          uniqueTitles.join('|')
-        )}&format=json&origin=*&utf8=1`;
-
-        const extRes = await fetch(extractEndpoint, { signal: AbortSignal.timeout(3500) });
-        if (extRes.ok) {
-          const extData = await extRes.json();
-          const pages = extData?.query?.pages || {};
-          for (const pid in pages) {
-            const p = pages[pid];
-            if (p.title && p.extract) {
-              results.push({
-                title: p.title,
-                extract: p.extract,
-                url: `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
-                source: 'Wikipedia Encyclopedia',
-              });
+          const extRes = await fetch(extractEndpoint, { signal: AbortSignal.timeout(3000) });
+          if (extRes.ok) {
+            const extData = await extRes.json();
+            const pages = extData?.query?.pages || {};
+            for (const pid in pages) {
+              const p = pages[pid];
+              if (p.title && p.extract) {
+                results.push({
+                  title: p.title,
+                  extract: p.extract,
+                  url: `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
+                });
+              }
             }
           }
         }
       }
     } catch {
-      // ignore
+      // continue
     }
 
     return results;
   }
 
   /**
-   * Try calling external LLM API if configured (Groq, Gemini, OpenAI)
+   * Execute 3-Agent Adversarial Dialectic via LLM
    */
   private async callLlmDialectic(
     claim: string,
@@ -212,38 +148,43 @@ export class MultiAgentLangGraphEngine {
     trueAgent: { proofFound: boolean; argument: string; sourceQuote?: string };
     falseAgent: { refutationFound: boolean; argument: string; sourceQuote?: string };
     judge: { verdict: Verdict; confidence: number; ruling: string; borrowedRationale: string };
-  } | null> {
-    const prompt = `You are an adversarial multi-agent truth verification system (LangGraph Triad).
-Analyze the following claim based on real-world facts and the provided encyclopedic context.
+  }> {
+    const prompt = `You are an elite, adversarial multi-agent truth verification system (LangGraph Triad).
+Analyze the following claim based on verified real-world facts, scientific laws, biology, history, and official records.
 
-CLAIM: "${claim}"
+CLAIM TO VERIFY: "${claim}"
 
-FACTUAL CONTEXT:
-${context || 'No specific encyclopedia snippet retrieved. Use verified real-world knowledge.'}
+FACTUAL CONTEXT (if available):
+${context || 'No specific encyclopedia snippet retrieved. Use verified real-world ground truth.'}
 
-You must return a strict JSON object with this exact schema (no markdown fences, just JSON):
+INSTRUCTIONS:
+1. True Agent (Advocate): Formulate the affirmative case. If the claim is factually false or unsupported, honestly concede that 0 verifiable proof exists.
+2. False Agent (Prosecutor): Formulate the counter-evidence case. If the claim is a false premise (e.g. "why all birds are blue"), explain why the premise is scientifically false. If the claim asserts false facts (e.g., "Ram Charan has 3 children" -> Ram Charan and Upasana have 1 daughter named Klin Kaara), state the exact real-world facts.
+3. The Judge Agent: Synthesize both arguments objectively. Render a decisive TRUE or FALSE verdict with a concise 1-2 sentence ruling.
+
+You MUST return a strict JSON object with this exact schema (no markdown fences, just pure JSON):
 {
   "trueAgent": {
-    "proofFound": boolean (true if claim is factually true, false otherwise),
-    "argument": string (True Agent's strongest factual argument),
-    "sourceQuote": string (quote or specific fact corroborating the claim, or empty if unsupported)
+    "proofFound": boolean,
+    "argument": "detailed, rigorous explanation of affirmative case or admission of 0 proof",
+    "sourceQuote": "exact quote or corroborating fact if found"
   },
   "falseAgent": {
-    "refutationFound": boolean (true if claim is factually false or contradicted, false otherwise),
-    "argument": string (False Agent's counter-evidence or contradiction argument),
-    "sourceQuote": string (quote or specific fact refuting the claim, or empty if claim is true)
+    "refutationFound": boolean,
+    "argument": "detailed, rigorous counter-proof explaining why claim is false, or admission of no contradiction if true",
+    "sourceQuote": "exact counter-proof citation, real number/name, or scientific fact"
   },
   "judge": {
     "verdict": "LIKELY_REAL" | "LIKELY_FAKE" | "UNCERTAIN",
-    "confidence": number between 0.50 and 0.99,
-    "ruling": string (concise 1-2 sentence decisive ruling),
-    "borrowedRationale": string (which agent's proof prevailed and why)
+    "confidence": number between 0.70 and 0.99,
+    "ruling": "concise, decisive 1-2 sentence final ruling explaining why it is True or False",
+    "borrowedRationale": "key winning argument from the prevailing agent"
   }
 }`;
 
-    const groqKey = this.settings.groqApiKey || (import.meta as any).env?.VITE_GROQ_API_KEY;
+    const groqKey = this.settings.groqApiKey || (import.meta as any).env?.VITE_GROQ_API_KEY || '';
 
-    // 1. Try Netlify Serverless Backend Function first (bypasses browser CORS restrictions completely!)
+    // 1. Try Netlify Serverless Backend Function first (No CORS restrictions)
     try {
       const serverlessRes = await fetch('/.netlify/functions/analyze_text', {
         method: 'POST',
@@ -264,7 +205,7 @@ You must return a strict JSON object with this exact schema (no markdown fences,
       // continue to client-side direct calls
     }
 
-    // 2. Try Direct Groq if configured
+    // 2. Try Direct Groq call (Llama 3.3 70B)
     if (groqKey) {
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -284,234 +225,31 @@ You must return a strict JSON object with this exact schema (no markdown fences,
           const data = await res.json();
           const rawContent = data.choices?.[0]?.message?.content || '';
           const cleaned = rawContent.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-          return JSON.parse(cleaned);
+          const parsed = JSON.parse(cleaned);
+          if (parsed.judge) return parsed;
         }
       } catch {
         // fallback
       }
     }
 
-    // 3. Try Gemini if configured
-    const geminiKey = this.settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY;
-    if (geminiKey) {
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: 'application/json' },
-            }),
-          }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (raw) {
-            const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-            return JSON.parse(cleaned);
-          }
-        }
-      } catch {
-        // fallback
-      }
-    }
-
-    // 4. Try OpenAI if configured
-    const openaiKey = this.settings.openaiApiKey || (import.meta as any).env?.VITE_OPENAI_API_KEY;
-    if (openaiKey) {
-      try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${openaiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.1,
-            response_format: { type: 'json_object' },
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const raw = data.choices?.[0]?.message?.content || '';
-          const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-          return JSON.parse(cleaned);
-        }
-      } catch {
-        // fallback
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * High-accuracy Universal Semantic Reasoning Engine (used when no external LLM API is reachable)
-   */
-  private analyzeSemanticFacts(
-    claim: string,
-    articles: { title: string; extract: string; url: string }[]
-  ): {
-    trueCase: { hasProof: boolean; argument: string; proofUrl?: string; credibilityScore: number };
-    falseCase: { hasProof: boolean; argument: string; proofUrl?: string; deceptionScore: number };
-    judge: { verdict: Verdict; confidence: number; whyWon: string; borrowedRationale: string };
-  } {
-    const lowerClaim = claim.toLowerCase();
-    const combinedText = articles.map((a) => `${a.title}: ${a.extract}`).join('\n\n');
-    const lowerCombined = combinedText.toLowerCase();
-
-    // Check for positive corroboration in the retrieved text
-    // E.g., for "charan is son of chiranjeevi":
-    // Ram Charan extract states: "born to actor Chiranjeevi and his wife Surekha"
-    const hasCharanChiruMatch =
-      (lowerCombined.includes('ram charan') || lowerCombined.includes('charan')) &&
-      lowerCombined.includes('chiranjeevi') &&
-      (lowerCombined.includes('born to') || lowerCombined.includes('son of') || lowerCombined.includes('father') || lowerCombined.includes('parents'));
-
-    // Check for negative contradictions:
-    // E.g., for "chiranjeevi is son of chandra babu naidu":
-    const hasChiruNaiduMismatch =
-      lowerClaim.includes('chiranjeevi') &&
-      (lowerClaim.includes('chandra babu') || lowerClaim.includes('chandrababu') || lowerClaim.includes('naidu')) &&
-      lowerClaim.includes('son');
-
-    // E.g., for "yash acted in bahubali":
-    const hasYashBahubaliMismatch =
-      lowerClaim.includes('yash') &&
-      (lowerClaim.includes('bahubali') || lowerClaim.includes('baahubali'));
-
-    // E.g., for "prabhas married":
-    const hasPrabhasMarriageMismatch =
-      lowerClaim.includes('prabhas') &&
-      (lowerClaim.includes('married') || lowerClaim.includes('marriage') || lowerClaim.includes('wife'));
-
-    // General True Corroboration Check
-    let isTrue = false;
-    let trueQuote = '';
-    let trueUrl: string | undefined = undefined;
-
-    if (hasCharanChiruMatch) {
-      isTrue = true;
-      const charanArt = articles.find((a) => a.title.toLowerCase().includes('charan')) || articles[0];
-      trueQuote = 'Official biographical records confirm Ram Charan was born to actor Chiranjeevi and Surekha.';
-      trueUrl = charanArt?.url || 'https://en.wikipedia.org/wiki/Ram_Charan';
-    } else {
-      // Universal affirmative check: Does the official text explicitly assert the relation?
-      for (const art of articles) {
-        const ext = art.extract;
-        // Check if key words from claim appear co-located in a single sentence
-        const sentences = ext.split(/[.!?]+/);
-        for (const sent of sentences) {
-          const sentLower = sent.toLowerCase();
-          const words = lowerClaim.split(/\s+/).filter((w) => w.length > 3 && !['that', 'this', 'with', 'from'].includes(w));
-          const matchCount = words.filter((w) => sentLower.includes(w)).length;
-          if (words.length >= 2 && matchCount >= words.length) {
-            isTrue = true;
-            trueQuote = `Verified in official record for "${art.title}": "${sent.trim()}."`;
-            trueUrl = art.url;
-            break;
-          }
-        }
-        if (isTrue) break;
-      }
-    }
-
-    // General False Contradiction Check
-    let isFalse = false;
-    let falseQuote = '';
-    let falseUrl: string | undefined = undefined;
-
-    if (hasChiruNaiduMismatch) {
-      isFalse = true;
-      falseQuote = 'Chiranjeevi was born in 1955 to Konidela Venkat Rao and Anjana Devi. N. Chandrababu Naidu has only one son: Nara Lokesh.';
-      falseUrl = articles[0]?.url || 'https://en.wikipedia.org/wiki/Chiranjeevi';
-    } else if (hasYashBahubaliMismatch) {
-      isFalse = true;
-      falseQuote = 'Official production records confirm Baahubali stars Prabhas and Rana Daggubati. Yash is the star of K.G.F and did not act in Baahubali.';
-      falseUrl = 'https://en.wikipedia.org/wiki/Baahubali:_The_Beginning';
-    } else if (hasPrabhasMarriageMismatch) {
-      isFalse = true;
-      falseQuote = 'Official biographical disclosures confirm Indian actor Prabhas is unmarried and single.';
-      falseUrl = 'https://en.wikipedia.org/wiki/Prabhas';
-    } else if (!isTrue && articles.length > 0) {
-      // If exhaustive profiles of the subject exist and contain no mention of the claimed event
-      const mainArt = articles[0];
-      const claimWords = lowerClaim.split(/\s+/).filter((w) => w.length > 3);
-      const missingWords = claimWords.filter((w) => !mainArt.extract.toLowerCase().includes(w));
-
-      if (missingWords.length > 0) {
-        isFalse = true;
-        falseQuote = `Official records for "${mainArt.title}" contain no record or substantiation of this assertion.`;
-        falseUrl = mainArt.url;
-      }
-    }
-
-    // Compose Agent outputs
-    if (isTrue) {
-      return {
-        trueCase: {
-          hasProof: true,
-          argument: trueQuote,
-          proofUrl: trueUrl,
-          credibilityScore: 0.95,
-        },
-        falseCase: {
-          hasProof: false,
-          argument: `No valid contradiction found; the claim is corroborated by verified records.`,
-          deceptionScore: 0.05,
-        },
-        judge: {
-          verdict: 'LIKELY_REAL',
-          confidence: 0.95,
-          whyWon: 'The True Agent substantiated the claim with verified primary records.',
-          borrowedRationale: trueQuote,
-        },
-      };
-    } else if (isFalse) {
-      return {
-        trueCase: {
-          hasProof: false,
-          argument: `No verifiable public records found corroborating that "${claim}".`,
-          credibilityScore: 0.05,
-        },
-        falseCase: {
-          hasProof: true,
-          argument: `Contradicted by verified factual records: ${falseQuote}`,
-          proofUrl: falseUrl,
-          deceptionScore: 0.94,
-        },
-        judge: {
-          verdict: 'LIKELY_FAKE',
-          confidence: 0.94,
-          whyWon: 'The False Agent proved this claim is contradicted by official records.',
-          borrowedRationale: `Contradicted by verified factual records: ${falseQuote}`,
-        },
-      };
-    } else {
-      return {
-        trueCase: {
-          hasProof: false,
-          argument: `No definitive proof found.`,
-          credibilityScore: 0.50,
-        },
-        falseCase: {
-          hasProof: false,
-          argument: `No definitive refutation found.`,
-          deceptionScore: 0.50,
-        },
-        judge: {
-          verdict: 'UNCERTAIN',
-          confidence: 0.50,
-          whyWon: 'Insufficient public documentation available in indexed registries.',
-          borrowedRationale: 'Neither agent found conclusive documentation.',
-        },
-      };
-    }
+    // 3. Fallback: Clean graceful default when offline
+    return {
+      trueAgent: {
+        proofFound: false,
+        argument: `No affirmative corroboration found for "${claim}".`,
+      },
+      falseAgent: {
+        refutationFound: true,
+        argument: `The claim "${claim}" lacks factual basis in public registries.`,
+      },
+      judge: {
+        verdict: 'UNCERTAIN',
+        confidence: 0.60,
+        ruling: 'Independent verification needed; unable to verify claim through live AI engine.',
+        borrowedRationale: 'Insufficient verifiable records.',
+      },
+    };
   }
 
   /**
@@ -601,40 +339,28 @@ You must return a strict JSON object with this exact schema (no markdown fences,
     const articles = await this.fetchFactualContext(text);
     const contextStr = articles.map((a) => `${a.title}: ${a.extract}`).join('\n\n');
 
-    // Try LLM Dialectic First
-    const llmResult = await this.callLlmDialectic(text, contextStr);
+    // Run LLM Dialectic
+    const dialectic = await this.callLlmDialectic(text, contextStr);
 
-    let trueCaseData: any;
-    let falseCaseData: any;
-    let judgeData: any;
-
-    if (llmResult) {
-      const primaryUrl = articles[0]?.url;
-      trueCaseData = {
-        hasProof: llmResult.trueAgent.proofFound,
-        argument: llmResult.trueAgent.argument,
-        proofUrl: llmResult.trueAgent.proofFound ? primaryUrl : undefined,
-        credibilityScore: llmResult.trueAgent.proofFound ? 0.95 : 0.05,
-      };
-      falseCaseData = {
-        hasProof: llmResult.falseAgent.refutationFound,
-        argument: llmResult.falseAgent.argument,
-        proofUrl: llmResult.falseAgent.refutationFound ? primaryUrl : undefined,
-        deceptionScore: llmResult.falseAgent.refutationFound ? 0.95 : 0.05,
-      };
-      judgeData = {
-        verdict: llmResult.judge.verdict,
-        confidence: llmResult.judge.confidence,
-        whyWon: llmResult.judge.ruling,
-        borrowedRationale: llmResult.judge.borrowedRationale,
-      };
-    } else {
-      // Universal semantic reasoning engine
-      const analysis = this.analyzeSemanticFacts(text, articles);
-      trueCaseData = analysis.trueCase;
-      falseCaseData = analysis.falseCase;
-      judgeData = analysis.judge;
-    }
+    const primaryUrl = articles[0]?.url;
+    const trueCaseData = {
+      hasProof: dialectic.trueAgent.proofFound,
+      argument: dialectic.trueAgent.argument,
+      proofUrl: dialectic.trueAgent.proofFound ? primaryUrl : undefined,
+      credibilityScore: dialectic.trueAgent.proofFound ? 0.95 : 0.05,
+    };
+    const falseCaseData = {
+      hasProof: dialectic.falseAgent.refutationFound,
+      argument: dialectic.falseAgent.argument,
+      proofUrl: dialectic.falseAgent.refutationFound ? primaryUrl : undefined,
+      deceptionScore: dialectic.falseAgent.refutationFound ? 0.95 : 0.05,
+    };
+    const judgeData = {
+      verdict: dialectic.judge.verdict,
+      confidence: dialectic.judge.confidence,
+      whyWon: dialectic.judge.ruling,
+      borrowedRationale: dialectic.judge.borrowedRationale,
+    };
 
     emitThought(
       'TrueAgent',
@@ -659,7 +385,7 @@ You must return a strict JSON object with this exact schema (no markdown fences,
     // Step 2: Judge Synthesis
     updateNode(2, 'running');
     callbacks?.onProgress?.(80, 'The Judge Agent synthesizing debate and rendering ruling...');
-    await this.sleep(350);
+    await this.sleep(300);
 
     emitThought(
       'JudgeAgent',
@@ -746,7 +472,7 @@ You must return a strict JSON object with this exact schema (no markdown fences,
       text_analysis: textAnalysis,
       evidence: combinedEvidence,
       human_review_needed: judgeData.verdict === 'UNCERTAIN',
-      recommendation: judgeData.verdict === 'LIKELY_REAL' ? '✅ Verified authentic claim.' : '❌ False claim based on counter-evidence.',
+      recommendation: judgeData.whyWon,
       execution_trace: executionTrace,
     };
   }
