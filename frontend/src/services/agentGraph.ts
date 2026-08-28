@@ -56,9 +56,9 @@ export class MultiAgentLangGraphEngine {
     }
     return {
       provider: 'auto',
-      groqApiKey: '',
-      geminiApiKey: '',
-      openaiApiKey: '',
+      groqApiKey: (import.meta as any).env?.VITE_GROQ_API_KEY || '',
+      geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
+      openaiApiKey: (import.meta as any).env?.VITE_OPENAI_API_KEY || '',
       tavilyApiKey: '',
     };
   }
