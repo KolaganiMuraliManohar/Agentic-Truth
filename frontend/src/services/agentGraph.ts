@@ -171,14 +171,16 @@ You must return a strict JSON object with this exact schema (no markdown fences,
   }
 }`;
 
+    const groqKey = this.settings.groqApiKey || (import.meta as any).env?.VITE_GROQ_API_KEY;
+
     // 1. Try Groq if configured
-    if (this.settings.groqApiKey) {
+    if (groqKey) {
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.settings.groqApiKey}`,
+            Authorization: `Bearer ${groqKey}`,
           },
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
@@ -189,7 +191,9 @@ You must return a strict JSON object with this exact schema (no markdown fences,
         });
         if (res.ok) {
           const data = await res.json();
-          return JSON.parse(data.choices[0].message.content);
+          const rawContent = data.choices?.[0]?.message?.content || '';
+          const cleaned = rawContent.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+          return JSON.parse(cleaned);
         }
       } catch {
         // fallback
@@ -197,10 +201,11 @@ You must return a strict JSON object with this exact schema (no markdown fences,
     }
 
     // 2. Try Gemini if configured
-    if (this.settings.geminiApiKey) {
+    const geminiKey = this.settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    if (geminiKey) {
       try {
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.settings.geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -213,7 +218,10 @@ You must return a strict JSON object with this exact schema (no markdown fences,
         if (res.ok) {
           const data = await res.json();
           const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (raw) return JSON.parse(raw);
+          if (raw) {
+            const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+            return JSON.parse(cleaned);
+          }
         }
       } catch {
         // fallback
@@ -221,13 +229,14 @@ You must return a strict JSON object with this exact schema (no markdown fences,
     }
 
     // 3. Try OpenAI if configured
-    if (this.settings.openaiApiKey) {
+    const openaiKey = this.settings.openaiApiKey || (import.meta as any).env?.VITE_OPENAI_API_KEY;
+    if (openaiKey) {
       try {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.settings.openaiApiKey}`,
+            Authorization: `Bearer ${openaiKey}`,
           },
           body: JSON.stringify({
             model: 'gpt-4o-mini',
@@ -238,7 +247,9 @@ You must return a strict JSON object with this exact schema (no markdown fences,
         });
         if (res.ok) {
           const data = await res.json();
-          return JSON.parse(data.choices[0].message.content);
+          const raw = data.choices?.[0]?.message?.content || '';
+          const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+          return JSON.parse(cleaned);
         }
       } catch {
         // fallback
