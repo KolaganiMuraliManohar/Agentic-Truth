@@ -232,12 +232,15 @@ const TextScanner: React.FC = () => {
           {/* Judge Ruling */}
           <div style={{ margin: '1.25rem 0' }}>
             <div className={`recommendation-card ${result.verdict.toLowerCase()}`}>
-              <strong style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.95rem' }}>
+              <strong style={{ display: 'block', fontSize: '1rem', lineHeight: '1.4' }}>
                 {result.recommendation}
               </strong>
-              <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                {result.execution_trace?.judgeSynthesis?.whyWon}
-              </p>
+              {result.execution_trace?.judgeSynthesis?.whyWon &&
+               result.execution_trace.judgeSynthesis.whyWon !== result.recommendation && (
+                <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  {result.execution_trace.judgeSynthesis.whyWon}
+                </p>
+              )}
             </div>
           </div>
 

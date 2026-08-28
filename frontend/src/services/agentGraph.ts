@@ -243,7 +243,28 @@ You must return a strict JSON object with this exact schema (no markdown fences,
 
     const groqKey = this.settings.groqApiKey || (import.meta as any).env?.VITE_GROQ_API_KEY;
 
-    // 1. Try Groq if configured
+    // 1. Try Netlify Serverless Backend Function first (bypasses browser CORS restrictions completely!)
+    try {
+      const serverlessRes = await fetch('/.netlify/functions/analyze_text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: claim,
+          context,
+          groq_api_key: groqKey,
+        }),
+      });
+      if (serverlessRes.ok) {
+        const data = await serverlessRes.json();
+        if (data.llm_dialectic?.judge) {
+          return data.llm_dialectic;
+        }
+      }
+    } catch {
+      // continue to client-side direct calls
+    }
+
+    // 2. Try Direct Groq if configured
     if (groqKey) {
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -270,7 +291,7 @@ You must return a strict JSON object with this exact schema (no markdown fences,
       }
     }
 
-    // 2. Try Gemini if configured
+    // 3. Try Gemini if configured
     const geminiKey = this.settings.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY;
     if (geminiKey) {
       try {
@@ -298,7 +319,7 @@ You must return a strict JSON object with this exact schema (no markdown fences,
       }
     }
 
-    // 3. Try OpenAI if configured
+    // 4. Try OpenAI if configured
     const openaiKey = this.settings.openaiApiKey || (import.meta as any).env?.VITE_OPENAI_API_KEY;
     if (openaiKey) {
       try {
@@ -324,23 +345,6 @@ You must return a strict JSON object with this exact schema (no markdown fences,
       } catch {
         // fallback
       }
-    }
-
-    // 4. Try Netlify Serverless Backend function
-    try {
-      const res = await fetch('/.netlify/functions/analyze_text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: claim }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.llm_dialectic) {
-          return data.llm_dialectic;
-        }
-      }
-    } catch {
-      // fallback
     }
 
     return null;
